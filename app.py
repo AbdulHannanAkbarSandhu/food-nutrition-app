@@ -1,10 +1,9 @@
 import streamlit as st
-from ultralytics import YOLO
-import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 import json
-import os
+import requests
+from io import BytesIO
 
 # Page config
 st.set_page_config(
@@ -13,77 +12,82 @@ st.set_page_config(
     layout="wide"
 )
 
-#  CHANGE THIS TO YOUR MODEL FILENAME:
-MODEL_PATH = "best.pt"  # actual model filename
+# API Configuration
+st.sidebar.header("🔗 API Configuration")
+api_url = st.sidebar.text_input(
+    "YOLO API URL:", 
+    value="https://your-ngrok-url.ngrok.io/detect",
+    help="Enter your Google Colab ngrok URL here"
+)
 
-@st.cache_resource
-def load_model():
-    """Load the YOLO model (cached for performance)"""
+def detect_food_real(image, api_url):
+    """Call the real YOLO API"""
     try:
-        if not os.path.exists(MODEL_PATH):
-            st.error(f"Model file {MODEL_PATH} not found. Please upload your YOLOv8 model file.")
-            return None
-        return YOLO(MODEL_PATH)
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        return None
-
-def detect_food(image):
-    """Process uploaded image and return detection results"""
-    model = load_model()
-    if model is None:
-        return None
+        # Convert PIL image to bytes
+        img_byte_arr = BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
         
-    try:
-        # Convert PIL Image to numpy array
-        img_array = np.array(image)
+        # Make API request
+        files = {'image': ('image.png', img_byte_arr, 'image/png')}
+        response = requests.post(api_url, files=files, timeout=30)
         
-        # Run YOLO detection
-        results = model(img_array)
-        
-        # Process results
-        detections = []
-        for r in results:
-            boxes = r.boxes
-            if boxes is not None:
-                for box in boxes:
-                    x1, y1, x2, y2 = box.xyxy[0].tolist()
-                    confidence = float(box.conf[0].item())
-                    class_id = int(box.cls[0].item())
-                    class_name = model.names[class_id]
-                    
-                    if confidence > 0.3:
-                        detections.append({
-                            "class": class_name,
-                            "confidence": round(confidence, 3),
-                            "bbox": [int(x1), int(y1), int(x2-x1), int(y2-y1)]
-                        })
-        
-        detections.sort(key=lambda x: x['confidence'], reverse=True)
-        
-        return {
-            "detections": detections,
-            "status": "success",
-            "message": f"Found {len(detections)} food items",
-            "image_size": {"width": img_array.shape[1], "height": img_array.shape[0]}
-        }
-        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {
+                "detections": [],
+                "status": "error",
+                "message": f"API request failed: {response.status_code}"
+            }
+            
     except Exception as e:
         return {
             "detections": [],
-            "status": "error", 
-            "message": f"Detection failed: {str(e)}"
+            "status": "error",
+            "message": f"API connection failed: {str(e)}"
         }
 
-# Streamlit UI
-st.title("🍎 NutriVision - AI Food Detection")
-st.write("Upload an image to detect food items using YOLOv8")
+def draw_bounding_boxes(image, detections):
+    """Draw bounding boxes on the image"""
+    img_copy = image.copy()
+    draw = ImageDraw.Draw(img_copy)
+    
+    for detection in detections:
+        bbox = detection["bbox"]
+        x, y, w, h = bbox
+        
+        # Draw rectangle
+        draw.rectangle([x, y, x + w, y + h], outline="red", width=3)
+        
+        # Draw label
+        label = f"{detection['class']} ({detection['confidence']:.2f})"
+        draw.text((x, y - 20), label, fill="red")
+    
+    return img_copy
 
-# Create two columns
+# Main app
+st.title("🍎 NutriVision - Real AI Food Detection")
+st.write("Upload an image to detect food items using your trained YOLOv8 model")
+
+# Test API connection
+if st.sidebar.button("🔧 Test API Connection"):
+    try:
+        health_url = api_url.replace('/detect', '/health')
+        response = requests.get(health_url, timeout=10)
+        if response.status_code == 200:
+            st.sidebar.success("✅ API Connected!")
+            st.sidebar.json(response.json())
+        else:
+            st.sidebar.error("❌ API Connection Failed")
+    except:
+        st.sidebar.error("❌ Cannot reach API")
+
+# Main interface
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.header("Upload Image")
+    st.header("📸 Upload Image")
     uploaded_file = st.file_uploader(
         "Choose a food image...", 
         type=['png', 'jpg', 'jpeg'],
@@ -92,57 +96,51 @@ with col1:
     
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
-        st.image(image, caption='Uploaded Image', use_column_width=True)
+        st.image(image, caption='Original Image', use_column_width=True)
 
 with col2:
-    st.header("Detection Results")
+    st.header("🔍 Detection Results")
     
     if uploaded_file is not None:
-        if st.button(' Detect Food Items', type="primary"):
-            with st.spinner('Analyzing your food image...'):
-                result = detect_food(image)
-                
-            if result and result["status"] == "success":
-                st.success(f" {result['message']}")
-                
-                if result["detections"]:
-                    st.subheader("Detected Food Items:")
-                    
-                    # Display results in a nice format
-                    for i, detection in enumerate(result["detections"]):
-                        with st.container():
-                            st.write(f"**{detection['class'].title()}**")
-                            st.write(f"Confidence: {detection['confidence']:.1%}")
-                            st.write(f"Location: {detection['bbox']}")
-                            st.write("---")
-                
-                # Show full JSON for API development
-                with st.expander(" Full API Response (for developers)"):
-                    st.json(result)
-                    
-            elif result:
-                st.error(f" {result['message']}")
+        if st.button('🚀 Detect Food Items', type="primary"):
+            if not api_url or "your-ngrok-url" in api_url:
+                st.error("❌ Please enter your real ngrok API URL in the sidebar")
             else:
-                st.error("Failed to process image")
+                with st.spinner('Calling your YOLO API...'):
+                    result = detect_food_real(image, api_url)
+                    
+                if result and result["status"] == "success":
+                    st.success(f"✅ {result['message']}")
+                    
+                    if result["detections"]:
+                        # Show image with bounding boxes
+                        img_with_boxes = draw_bounding_boxes(image, result["detections"])
+                        st.image(img_with_boxes, caption='Detected Food Items', use_column_width=True)
+                        
+                        # Show detection results
+                        st.subheader("🍽️ Detected Food Items:")
+                        
+                        for detection in result["detections"]:
+                            with st.container():
+                                st.write(f"**{detection['class'].title()}**")
+                                st.write(f"Confidence: {detection['confidence']:.1%}")
+                                st.write(f"Location: {detection['bbox']}")
+                                st.write("---")
+                    
+                    # Show full JSON
+                    with st.expander("📄 Full API Response"):
+                        st.json(result)
+                        
+                else:
+                    st.error(f"❌ {result.get('message', 'Detection failed')}")
     else:
-        st.info("� Upload an image to get started")
+        st.info("👆 Upload an image to get started")
 
-# API Information
+# Instructions
 st.markdown("---")
-st.subheader(" API Integration")
-st.write("This app can be used as an API endpoint for your applications.")
-
-# Show API endpoint 
-st.code("""
-# API Endpoint (after deployment):
-POST https://your-app-name.streamlit.app/api/detect
-
-# Example usage:
-import requests
-import json
-
-files = {'image': open('food_image.jpg', 'rb')}
-response = requests.post('https://your-app-name.streamlit.app/api/detect', files=files)
-result = response.json()
-print(result)
-""")
+st.subheader("📋 Setup Instructions")
+st.write("1. **Run the Google Colab notebook** with your YOLO model")
+st.write("2. **Copy the ngrok URL** from Colab output")
+st.write("3. **Paste the URL** in the sidebar (replace 'your-ngrok-url')")
+st.write("4. **Click 'Test API Connection'** to verify")
+st.write("5. **Upload an image** and click 'Detect Food Items'")
