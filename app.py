@@ -71,17 +71,17 @@ st.title("🍎 NutriVision - Real AI Food Detection")
 st.write("Upload an image to detect food items using your trained YOLOv8 model")
 
 # Test API connection
-if st.sidebar.button("🔧 Test API Connection"):
+if st.sidebar.button(" Test API Connection"):
     try:
         health_url = api_url.replace('/detect', '/health')
         response = requests.get(health_url, timeout=10)
         if response.status_code == 200:
-            st.sidebar.success("✅ API Connected!")
+            st.sidebar.success(" API Connected!")
             st.sidebar.json(response.json())
         else:
-            st.sidebar.error("❌ API Connection Failed")
+            st.sidebar.error("API Connection Failed")
     except:
-        st.sidebar.error("❌ Cannot reach API")
+        st.sidebar.error(" Cannot reach API")
 
 # Main interface
 col1, col2 = st.columns([1, 1])
@@ -110,7 +110,7 @@ with col2:
                     result = detect_food_real(image, api_url)
                     
                 if result and result["status"] == "success":
-                    st.success(f"✅ {result['message']}")
+                    st.success(f" {result['message']}")
                     
                     if result["detections"]:
                         # Show image with bounding boxes
@@ -132,13 +132,13 @@ with col2:
                         st.json(result)
                         
                 else:
-                    st.error(f"❌ {result.get('message', 'Detection failed')}")
+                    st.error(f" {result.get('message', 'Detection failed')}")
     else:
-        st.info("👆 Upload an image to get started")
+        st.info(" Upload an image to get started")
 
 # Instructions
 st.markdown("---")
-st.subheader("📋 Setup Instructions")
+st.subheader(" Setup Instructions")
 st.write("1. **Run the Google Colab notebook** with your YOLO model")
 st.write("2. **Copy the ngrok URL** from Colab output")
 st.write("3. **Paste the URL** in the sidebar (replace 'your-ngrok-url')")
