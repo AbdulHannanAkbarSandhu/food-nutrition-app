@@ -37,9 +37,9 @@ except Exception as e:
     model = None
 
 # API Keys (set as environment variables)
-OPENAI_API_KEY = os.getenv("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")
-NUTRITIONIX_APP_ID = os.getenv("c644b8fa")
-NUTRITIONIX_APP_KEY = os.getenv("63cb77c93a0ea32e457152cbae84f9f2")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+NUTRITIONIX_APP_ID = os.getenv("NUTRITIONIX_APP_ID")
+NUTRITIONIX_APP_KEY = os.getenv("NUTRITIONIX_APP_KEY")
 
 # Initialize OpenAI
 if OPENAI_API_KEY:
