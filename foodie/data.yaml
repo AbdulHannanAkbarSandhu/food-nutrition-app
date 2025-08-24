@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 24
+names: ['Beijing Beef', 'Chow Mein', 'Fried Rice', 'Hashbrown', 'Kung Pao Chicken', 'String Bean Chicken Breast', 'burger', 'carrot_eggs', 'chicken waffle', 'chicken_nuggets', 'chinese_cabbage', 'chinese_sausage', 'curry', 'drink', 'french fries', 'fried_chicken', 'fried_dumplings', 'fried_eggs', 'ketchup', 'mango chicken pocket', 'mung_bean_sprouts', 'rice', 'tostitos cheese dip sauce', 'water_spinach']
+
+roboflow:
+  workspace: food-8hg4c
+  project: foodie-l6xkb
+  version: 5
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/food-8hg4c/foodie-l6xkb/dataset/5
